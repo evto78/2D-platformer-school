@@ -6,8 +6,16 @@ public class PlayerController : MonoBehaviour
     public float speed;
 
     Rigidbody2D rb;
+    bool grounded;
 
-    
+    public float apexHeight;
+    public float apexTime;
+    float apexTimer;
+
+    public float terminalVelocity;
+
+    public float coyoteTime;
+    float coyoteTimer;
 
     public enum FacingDirection
     {
@@ -28,8 +36,9 @@ public class PlayerController : MonoBehaviour
 
     private void MovementUpdate(Vector2 playerInput)
     {
-        if(rb.velocity.x < 0f && playerInput.x > 0f) { rb.velocity = rb.velocity * Vector2.left; }
-        if(rb.velocity.x > 0f && playerInput.x < 0f) { rb.velocity = rb.velocity * Vector2.left; }
+        //ground movement
+        if(rb.velocity.x < 0f && playerInput.x > 0f) { rb.velocity = new Vector2(rb.velocity.x / -2f, rb.velocity.y); }
+        if(rb.velocity.x > 0f && playerInput.x < 0f) { rb.velocity = new Vector2(rb.velocity.x / -2f, rb.velocity.y); }
 
         rb.AddForce(new Vector2(playerInput.x, 0f) * speed * 100f * Time.deltaTime);
 
@@ -40,6 +49,27 @@ public class PlayerController : MonoBehaviour
         else if (rb.velocity.x < -maxSpeed)
         {
             rb.velocity = new Vector2(-maxSpeed, rb.velocity.y);
+        }
+
+        //air movement
+        coyoteTimer -= Time.deltaTime;
+
+        if (playerInput.y > 0f && (IsGrounded() || coyoteTimer > 0f))
+        {
+            coyoteTimer = 0f;
+            rb.gravityScale = 0f;
+
+            rb.AddForce(new Vector2(0f, apexHeight));
+            apexTimer = 0f;
+        }
+
+        apexTimer += Time.deltaTime;
+
+        if(apexTimer > apexTime && !IsGrounded()) { rb.gravityScale = 1f; }
+
+        if (rb.velocity.y < -terminalVelocity)
+        {
+            rb.velocity = new Vector2(rb.velocity.x, -terminalVelocity);
         }
     }
 
@@ -57,7 +87,7 @@ public class PlayerController : MonoBehaviour
     }
     public bool IsGrounded()
     {
-        if(Physics2D.BoxCast(new Vector2(transform.position.x, transform.position.y), new Vector2(0.33f, 1f), 0f, Vector2.down))
+        if(grounded)
         {
             return true;
         }
@@ -65,6 +95,17 @@ public class PlayerController : MonoBehaviour
         {
             return false;
         }
+    }
+
+    private void OnTriggerEnter2D(Collider2D collision)
+    {
+        grounded = true;
+    }
+
+    private void OnTriggerExit2D(Collider2D collision)
+    {
+        grounded = false;
+        coyoteTimer = coyoteTime;
     }
 
     public FacingDirection GetFacingDirection()
