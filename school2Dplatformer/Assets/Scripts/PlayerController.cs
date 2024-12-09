@@ -3,6 +3,7 @@ using UnityEngine;
 public class PlayerController : MonoBehaviour
 {
     public float maxSpeed;
+    float initialMaxSpeed;
     public float speed;
 
     Rigidbody2D rb;
@@ -17,6 +18,15 @@ public class PlayerController : MonoBehaviour
     public float coyoteTime;
     float coyoteTimer;
 
+    public float dashCooldown;
+    float dashCooldownTimer;
+    public float dashVelocityThreshold;
+
+    public float slamReboundTime;
+    float slamReboundTimer;
+    bool slamming;
+    float slammingTimer;
+
     public enum FacingDirection
     {
         left, right
@@ -25,6 +35,8 @@ public class PlayerController : MonoBehaviour
     void Start()
     {
         rb = GetComponent<Rigidbody2D>();
+        initialMaxSpeed = maxSpeed;
+        slamming = false;
     }
 
     void Update()
@@ -32,10 +44,19 @@ public class PlayerController : MonoBehaviour
 
         Vector2 playerInput = new Vector2(Input.GetAxis("Horizontal"), Input.GetAxis("Vertical"));
         MovementUpdate(playerInput);
+
+        InputManager();
+        dashCooldownTimer -= Time.deltaTime;
     }
 
     private void MovementUpdate(Vector2 playerInput)
     {
+        if(maxSpeed > initialMaxSpeed)
+        {
+            maxSpeed = maxSpeed - Time.deltaTime * 5f;
+            if (maxSpeed < initialMaxSpeed) { maxSpeed = initialMaxSpeed; }
+        }
+
         //ground movement
         if(rb.velocity.x < 0f && playerInput.x > 0f) { rb.velocity = new Vector2(rb.velocity.x / -2f, rb.velocity.y); }
         if(rb.velocity.x > 0f && playerInput.x < 0f) { rb.velocity = new Vector2(rb.velocity.x / -2f, rb.velocity.y); }
@@ -59,7 +80,16 @@ public class PlayerController : MonoBehaviour
             coyoteTimer = 0f;
             rb.gravityScale = 0f;
 
-            rb.AddForce(new Vector2(0f, apexHeight));
+            if(slamReboundTimer > 0f)
+            {
+                rb.AddForce(new Vector2(0f, apexHeight * (1 + slammingTimer)));
+                slamReboundTimer = 0f;
+                slammingTimer = 0f;
+            }
+            else
+            {
+                rb.AddForce(new Vector2(0f, apexHeight));
+            }
             apexTimer = 0f;
         }
 
@@ -71,6 +101,55 @@ public class PlayerController : MonoBehaviour
         {
             rb.velocity = new Vector2(rb.velocity.x, -terminalVelocity);
         }
+
+        //Slamming
+        slamReboundTimer -= Time.deltaTime;
+
+        if(playerInput.y < 0f && !IsGrounded())
+        {
+            rb.velocity = new Vector2(rb.velocity.x, -terminalVelocity);
+            slamming = true;
+            slammingTimer = 0f;
+        }
+        
+        if(slamming && !IsGrounded())
+        {
+            slammingTimer += Time.deltaTime;
+        }
+
+        if(slamming && IsGrounded())
+        {
+            slamming = false;
+            slamReboundTimer = slamReboundTime;
+        }
+    }
+
+    public void InputManager()
+    {
+        if (Input.GetKeyDown(KeyCode.Space))
+        {
+            if(dashCooldownTimer <= 0)
+            {
+
+                Dash();
+            }
+        }
+    }
+
+    void Dash()
+    {
+        maxSpeed = maxSpeed * 2;
+
+        if(rb.velocity.magnitude > dashVelocityThreshold)
+        {
+            rb.velocity = rb.velocity * 2f;
+        }
+        else
+        {
+            rb.velocity = rb.velocity * dashVelocityThreshold;
+        }
+        
+        dashCooldownTimer = dashCooldown;
     }
 
     public bool IsWalking()
@@ -124,4 +203,6 @@ public class PlayerController : MonoBehaviour
         }
         
     }
+
+    
 }
